@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: { chunkSizeWarningLimit: 600 }, // supabase-js is most of the main bundle
   plugins: [
     react(),
     VitePWA({

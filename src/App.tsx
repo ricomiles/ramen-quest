@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { hasPin, supabase } from './lib/supabase'
 import { DataProvider } from './lib/data'
@@ -8,9 +8,11 @@ import Home from './screens/Home'
 import AddBowl from './screens/AddBowl'
 import Detail from './screens/Detail'
 import HeadToHead from './screens/HeadToHead'
-import MapScreen from './screens/MapScreen'
 import ToTry from './screens/ToTry'
 import Ranks from './screens/Ranks'
+
+// Leaflet is the heaviest dependency, so only load it when the Map tab opens.
+const MapScreen = lazy(() => import('./screens/MapScreen'))
 
 export default function App() {
   // undefined = still checking the saved PIN, null = need to enter one
@@ -35,7 +37,7 @@ export default function App() {
             <Route path="/ep/:id/edit" element={<AddBowl />} />
             <Route path="/ranks" element={<Ranks />} />
             <Route path="/vs" element={<HeadToHead />} />
-            <Route path="/map" element={<MapScreen />} />
+            <Route path="/map" element={<Suspense fallback={<div className="screen" />}><MapScreen /></Suspense>} />
             <Route path="/to-try" element={<ToTry />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
