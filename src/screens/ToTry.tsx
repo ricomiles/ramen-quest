@@ -65,7 +65,8 @@ export default function ToTry() {
                 {open === w.id && (
                   <div className="wish-actions">
                     <button className="chip" onClick={() => updateWish(w.id, { pinned: !w.pinned })}>{w.pinned ? 'Unpin' : '★ Next up'}</button>
-                    <button className="chip" onClick={() => find(w)}>🔍 Find on map</button>
+                    <button className="chip" onClick={() => nav(`/map?place=${w.id}`)}>📍 {w.lat != null ? 'Move pin' : 'Pick on map'}</button>
+                    <button className="chip" onClick={() => find(w)}>🔍 Find</button>
                     <button className="chip" onClick={() => { const note = prompt('Note', w.note ?? ''); if (note != null) updateWish(w.id, { note: note.trim() || null }) }}>Edit note</button>
                     <button className="chip" onClick={() => deleteWish(w.id)}>Delete</button>
                   </div>

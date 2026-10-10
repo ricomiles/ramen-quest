@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useData } from '../lib/data'
@@ -13,8 +13,13 @@ type Filter = 'all' | 'slurped' | 'totry'
 type Spot = { key: string; lat: number; lng: number; label: string; hot: boolean; wish: boolean }
 
 export default function MapScreen() {
-  const { visits, wishes, names } = useData()
+  const { visits, wishes, names, updateWish } = useData()
   const nav = useNavigate()
+  const [params, setParams] = useSearchParams()
+  // ?place=<wish id>: tap the map to set where a to-try spot is.
+  const placing = wishes.find((x) => x.id === params.get('place'))
+  const [draft, setDraft] = useState<LatLng | null>(null)
+  const [saving, setSaving] = useState(false)
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const layer = useRef<L.LayerGroup | null>(null)
@@ -28,9 +33,11 @@ export default function MapScreen() {
       .filter((v) => v.lat != null)
       .map((v) => ({ key: v.id, lat: v.lat!, lng: v.lng!, label: v.awaitingMe ? '?' : fmt(v.together), hot: (v.together ?? 0) >= 8, wish: false })),
     ...(filter !== 'slurped' ? wishes : [])
-      .filter((w) => w.lat != null)
+      .filter((w) => w.lat != null && w.id !== placing?.id)
       .map((w) => ({ key: w.id, lat: w.lat!, lng: w.lng!, label: '?', hot: false, wish: true })),
   ]
+  const draftPos = draft ?? (placing?.lat != null ? { lat: placing.lat, lng: placing.lng! } : null)
+  if (placing && draftPos) spots.push({ key: 'draft', ...draftPos, label: '?', hot: false, wish: true })
 
   useEffect(() => {
     map.current = L.map(el.current!, { zoomControl: false, attributionControl: true }).setView(CEBU_CITY, 14)
@@ -46,11 +53,11 @@ export default function MapScreen() {
   }, [])
 
   // Redraw pins whenever data, filter or selection changes.
-  const sig = spots.map((s) => s.key + s.label).join() + selected
+  const sig = spots.map((s) => [s.key, s.label, s.lat, s.lng].join()).join() + selected
   useEffect(() => {
     layer.current!.clearLayers()
     for (const s of spots) {
-      const cls = ['pin', s.hot && 'hot', s.wish && 'wish', s.key === selected && 'sel'].filter(Boolean).join(' ')
+      const cls = ['pin', s.hot && 'hot', s.wish && 'wish', (s.key === selected || s.key === 'draft') && 'sel'].filter(Boolean).join(' ')
       L.marker([s.lat, s.lng], {
         icon: L.divIcon({ className: 'pin-anchor', html: `<div class="${cls}">${s.label}</div>`, iconSize: [0, 0] }),
       })
@@ -58,6 +65,29 @@ export default function MapScreen() {
         .addTo(layer.current!)
     }
   }, [sig])
+
+  // Placing mode: start on the spot's current pin (if any) and listen for taps.
+  useEffect(() => {
+    if (!placing) return
+    setDraft(null)
+    setSelected(null)
+    if (placing.lat != null) map.current!.setView([placing.lat, placing.lng!], 16)
+    const m = map.current!
+    const onClick = (e: L.LeafletMouseEvent) => setDraft({ lat: e.latlng.lat, lng: e.latlng.lng })
+    m.on('click', onClick)
+    return () => {
+      m.off('click', onClick)
+    }
+  }, [placing?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function savePin() {
+    if (!placing || !draft) return
+    setSaving(true)
+    await updateWish(placing.id, draft)
+    setSaving(false)
+    setParams({}, { replace: true })
+    setSelected(placing.id)
+  }
 
   // Fit to pins once we have some.
   useEffect(() => {
@@ -73,18 +103,32 @@ export default function MapScreen() {
 
   return (
     <div className="screen map-screen">
-      <div ref={el} className="map" />
-      <div className="map-filters chips">
+      <div ref={el} className={'map' + (placing ? ' placing' : '')} />
+      {!placing && <div className="map-filters chips">
         {(['all', 'slurped', 'totry'] as Filter[]).map((f) => (
           <button key={f} className={'chip solid' + (filter === f ? ' on' : '')} onClick={() => setFilter(f)}>
             {{ all: 'All', slurped: 'Slurped', totry: 'To-try' }[f]}
           </button>
         ))}
-      </div>
+      </div>}
 
       <div className="sheet">
         <div className="grab" />
-        {v ? (
+        {placing ? (
+          <>
+            <div className="sheet-row no-thumb">
+              <div className="min0">
+                <div className="tiny muted">PIN A TO-TRY SPOT</div>
+                <div className="dela t20 ellipsis">{placing.spot_name}</div>
+                <div className="t13 bold">{draft ? 'Looks good? Tap elsewhere to move it.' : 'Tap the map where it is.'}</div>
+              </div>
+            </div>
+            <div className="btn-pair">
+              <button className="btn press" onClick={() => nav(-1)}>Cancel</button>
+              <button className="btn btn-red press" onClick={savePin} disabled={!draft || saving}>{saving ? 'Saving…' : 'Save pin'}</button>
+            </div>
+          </>
+        ) : v ? (
           <>
             <div className="sheet-row">
               <Photo src={v.photos[0]} className="thumb72" />
@@ -114,10 +158,11 @@ export default function MapScreen() {
               <button className="btn press" onClick={() => nav(`/add?wish=${w.id}`)}>Went!</button>
               <a className="btn btn-yellow press" href={directionsUrl(pos!)} target="_blank" rel="noreferrer">Directions →</a>
             </div>
+            <button className="link-btn sheet-link" onClick={() => setParams({ place: w.id })}>📍 Move pin</button>
           </>
         ) : (
           <p className="muted center-pad">
-            {spots.length ? 'Tap a pin.' : 'No pins yet. Use “We’re here” or “Find” when logging a bowl.'}
+            {spots.length ? 'Tap a pin.' : 'No pins yet. Use “We’re here” when logging a bowl, or “Pick on map” on a to-try.'}
           </p>
         )}
       </div>
