@@ -1,10 +1,13 @@
-import { useState, type ChangeEvent } from 'react'
+import { Suspense, lazy, useState, type ChangeEvent } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useData, type VisitFields } from '../lib/data'
 import { FOOD_TYPES, categoriesFor } from '../lib/config'
 import { IDS, fmt, mean, other } from '../lib/score'
 import { currentPosition, geocode } from '../lib/media'
 import type { Visit, Wish } from '../lib/types'
+
+// Leaflet is heavy; only load the picker when it opens.
+const MapPicker = lazy(() => import('../components/MapPicker'))
 
 const today = () => new Date().toLocaleDateString('en-CA') // YYYY-MM-DD in local time
 
@@ -41,6 +44,7 @@ function Form({ visit, wish }: { visit?: Visit; wish?: Wish }) {
   const [uploading, setUploading] = useState(0)
   const [busy, setBusy] = useState(false)
   const [locMsg, setLocMsg] = useState('')
+  const [picking, setPicking] = useState(false)
   const [error, setError] = useState('')
 
   const set = <K extends keyof VisitFields>(k: K, v: VisitFields[K]) => setF((s) => ({ ...s, [k]: v }))
@@ -129,6 +133,7 @@ function Form({ visit, wish }: { visit?: Visit; wish?: Wish }) {
       <div className="loc-row mt8">
         <span className="label">{f.lat != null ? 'ON THE MAP ✓' : 'MAP PIN'}</span>
         <button className="chip" onClick={() => locate('here')}>📍 We're here</button>
+        <button className="chip" onClick={() => setPicking(true)}>🗺️ {f.lat != null ? 'Move pin' : 'Pick on map'}</button>
         <button className="chip" onClick={() => locate('find')} disabled={!f.spot_name}>🔍 Find</button>
         {f.lat != null && <button className="chip" onClick={() => setF((s) => ({ ...s, lat: null, lng: null }))}>✕</button>}
       </div>
@@ -197,6 +202,21 @@ function Form({ visit, wish }: { visit?: Visit; wish?: Wish }) {
         <span className="dela t18">{busy ? 'Saving…' : uploading ? 'Uploading…' : 'Save episode!'}</span>
         <span className="bold">{fmt(together)} together</span>
       </button>
+
+      {picking && (
+        <Suspense fallback={null}>
+          <MapPicker
+            title={f.spot_name}
+            initial={f.lat != null ? { lat: f.lat, lng: f.lng! } : null}
+            onCancel={() => setPicking(false)}
+            onSave={(pos) => {
+              setF((s) => ({ ...s, ...pos }))
+              setLocMsg('')
+              setPicking(false)
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
