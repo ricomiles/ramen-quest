@@ -23,9 +23,10 @@ export const currentPosition = () =>
     ),
   )
 
-/** Free OpenStreetMap geocoder. Fine for a couple of manual lookups. */
+/** Free OpenStreetMap geocoder, biased to the Cebu City area. Fine for a couple of manual lookups. */
 export async function geocode(query: string): Promise<LatLng | null> {
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`)
+  const cebu = 'countrycodes=ph&viewbox=123.75,10.45,124.05,10.20'
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&${cebu}&q=${encodeURIComponent(query)}`)
   const [hit] = await res.json()
   return hit ? { lat: +hit.lat, lng: +hit.lon } : null
 }

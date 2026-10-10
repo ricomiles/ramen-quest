@@ -7,6 +7,8 @@ import { fmt } from '../lib/score'
 import { currentPosition, directionsUrl, distanceKm, type LatLng } from '../lib/media'
 import { BottomNav, Photo } from '../components/ui'
 
+const CEBU_CITY: L.LatLngTuple = [10.3157, 123.8854]
+
 type Filter = 'all' | 'slurped' | 'totry'
 type Spot = { key: string; lat: number; lng: number; label: string; hot: boolean; wish: boolean }
 
@@ -19,6 +21,7 @@ export default function MapScreen() {
   const [filter, setFilter] = useState<Filter>('all')
   const [selected, setSelected] = useState<string | null>(null)
   const [me, setMe] = useState<LatLng | null>(null)
+  const fitted = useRef(false)
 
   const spots: Spot[] = [
     ...(filter !== 'totry' ? visits : [])
@@ -30,13 +33,13 @@ export default function MapScreen() {
   ]
 
   useEffect(() => {
-    map.current = L.map(el.current!, { zoomControl: false, attributionControl: true }).setView([35.68, 139.76], 13)
+    map.current = L.map(el.current!, { zoomControl: false, attributionControl: true }).setView(CEBU_CITY, 14)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
       maxZoom: 19,
     }).addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
-    currentPosition().then(setMe).catch(() => {})
+    currentPosition().then(setMe).catch(() => {}) // only used for "0.8 km" distances
     return () => {
       map.current?.remove()
     }
@@ -57,7 +60,6 @@ export default function MapScreen() {
   }, [sig])
 
   // Fit to pins once we have some.
-  const fitted = useRef(false)
   useEffect(() => {
     if (fitted.current || !spots.length) return
     fitted.current = true
