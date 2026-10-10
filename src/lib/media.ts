@@ -1,5 +1,8 @@
-/** Downscale to ~1600px on the long edge and re-encode as JPEG before upload. */
-export async function compressImage(file: File, maxEdge = 1600, quality = 0.82): Promise<Blob> {
+/**
+ * Downscale to 1280px on the long edge and re-encode before upload (~100–200 KB each).
+ * WebP where the browser can encode it, otherwise JPEG. Older Safari silently returns PNG for WebP.
+ */
+export async function compressImage(file: File, maxEdge = 1280): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
   const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
   const canvas = document.createElement('canvas')
@@ -7,9 +10,13 @@ export async function compressImage(file: File, maxEdge = 1600, quality = 0.82):
   canvas.height = Math.round(bitmap.height * scale)
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
   bitmap.close()
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not encode image'))), 'image/jpeg', quality),
-  )
+  const encode = (type: string, quality: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality))
+  const webp = await encode('image/webp', 0.75)
+  if (webp?.type === 'image/webp') return webp
+  const jpeg = await encode('image/jpeg', 0.75)
+  if (!jpeg) throw new Error('Could not encode image')
+  return jpeg
 }
 
 export type LatLng = { lat: number; lng: number }

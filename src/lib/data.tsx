@@ -107,8 +107,8 @@ export function DataProvider({ me, onSignOut, children }: { me: PersonId; onSign
 
       async uploadPhoto(file) {
         const blob = await compressImage(file)
-        const path = `${crypto.randomUUID()}.jpg`
-        check(await supabase.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' }))
+        const path = `${crypto.randomUUID()}.${blob.type === 'image/webp' ? 'webp' : 'jpg'}`
+        check(await supabase.storage.from('photos').upload(path, blob, { contentType: blob.type, cacheControl: '31536000' }))
         return supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
       },
 

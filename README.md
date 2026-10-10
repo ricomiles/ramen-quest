@@ -29,7 +29,7 @@ Import the repo in Vercel (it detects Vite). Add the same two `VITE_SUPABASE_*` 
 ## Notes
 
 - Live sync uses a Supabase Realtime broadcast ("something changed, reload"). The app also reloads when it comes back to the foreground.
-- Photos are compressed on the device (1600px JPEG) and stored in the public `photos` bucket under random filenames.
+- Photos are compressed on the device (1280px WebP/JPEG, ~100–200 KB) and stored in the public `photos` bucket under random filenames. The PWA caches them on the phone to save bandwidth.
 - Map pins come from "📍 We're here" or "🔍 Find" (OpenStreetMap search) on a bowl or to-try item.
 - Categories and styles are config-driven per food type in `src/lib/config.ts`.
 - Regenerate icons from `public/favicon.svg` with `pnpm icons`.
